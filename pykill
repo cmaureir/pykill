@@ -1,0 +1,88 @@
+#!/usr/bin/env python
+
+import sys
+import subprocess
+
+class Process:
+    def __init__(self, process_list):
+        if len(process_list) >= 11:
+            self.user = process_list[0]
+            self.pid = process_list[1]
+            self.cpu = process_list[2]
+            self.mem = process_list[3]
+            self.vsz = process_list[4]
+            self.rss = process_list[5]
+            self.tty = process_list[6]
+            self.stat = process_list[7]
+            self.start = process_list[8]
+            self.time = process_list[9]
+            self.command = process_list[10:]
+
+def get_current_username():
+    return subprocess.check_output(["whoami"]).decode("utf-8").strip()
+
+def get_processes(username, pattern = None):
+
+    out = subprocess.check_output(["ps", "aux", "-u", username])
+    out = out.decode("utf-8").strip().split("\n")
+    first_line = True
+
+    # ['USER', 'PID', '%CPU', '%MEM', 'VSZ', 'RSS', 'TTY', 'STAT', 'START', 'TIME', 'COMMAND']
+    title = None
+    processes = []
+    for i in out:
+        elements = i.split()
+
+        if first_line and not title:
+            title = elements
+            first_line = False
+
+        if elements[0] == username:
+            process = Process(elements)
+            if pattern:
+                if pattern in process.command[0]:
+                    processes.append(process)
+            else:
+                processes.append(process)
+
+    return title, processes
+
+def kill_process(process_id):
+    print("Killing process PID {}...".format(process_id))
+    out = subprocess.call(["kill", "-9", str(process_id)])
+
+
+
+if __name__ == "__main__":
+
+    pattern = None
+    if len(sys.argv) > 1:
+        pattern = sys.argv[1]
+
+    # Getting username
+    username = get_current_username()
+
+    # Getting list of processes from username
+    title, processes = get_processes(username, pattern)
+
+    if len(processes) > 0:
+        fmt = "{:>5} " + "{:10}"*4 + "{:20}"
+        print(fmt.format("ID", "User", "PID", "%CPU", "%MEM", "Command"))
+
+        for i, p in enumerate(processes):
+            print(fmt.format(i, p.user, p.pid, p.cpu, p.mem, p.command[0]))
+
+        print("ID to kill?: ", end="")
+
+        try:
+            process_id = int(input())
+            if process_id > i or process_id < 0:
+                print("Error: Invalid process ID")
+
+        except ValueError:
+            print("Error: A number is needed")
+
+        process = processes[process_id]
+        kill_process(process.pid)
+
+
